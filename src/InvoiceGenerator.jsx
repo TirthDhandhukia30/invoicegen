@@ -420,7 +420,7 @@ export default function InvoiceGenerator({ onBack }) {
             clonedInput.style.maxHeight = "none";
             clonedInput.style.overflow = "visible";
             clonedInput.style.height = "auto";
-            clonedInput.style.minHeight = (input.scrollHeight + 150) + "px"; // Add 150px buffer
+            clonedInput.style.minHeight = input.scrollHeight + 150 + "px"; // Add 150px buffer
           }
           // Remove all stylesheets to prevent oklch colors from being applied
           const stylesheets = clonedDoc.querySelectorAll(
