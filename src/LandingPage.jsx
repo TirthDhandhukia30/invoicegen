@@ -1,9 +1,30 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import SupabaseAuth from "@/components/auth";
 import { Spotlight } from "@/components/ui/spotlight";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { supabase } from "@/lib/supabase";
 
 export default function LandingPage({ onOpen }) {
+  const [showAuth, setShowAuth] = useState(false); // Don't show login modal by default
+  const [session, setSession] = useState(null);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden transition-colors duration-300">
       {/* Spotlight effect - only in dark mode */}
@@ -89,11 +110,68 @@ export default function LandingPage({ onOpen }) {
               />
             </svg>
           </Button>
+          {/* Login/Logout Button */}
+          <Button
+            variant="outline"
+            size="lg"
+            className="ml-6 mt-4 border-foreground/40 bg-transparent text-foreground px-8 py-3 rounded-full hover:bg-foreground/10 hover:border-foreground/60 hover:text-foreground font-medium text-base tracking-wide"
+            onClick={async () => {
+              if (session) {
+                // Logout and redirect to auth page
+                const { supabase } = await import("@/lib/supabase");
+                await supabase.auth.signOut();
+                setSession(null);
+                setShowAuth(true);
+              } else {
+                // Show login modal
+                setShowAuth(true);
+              }
+            }}
+          >
+            {session ? "Logout" : "Login"}
+          </Button>
         </div>
 
         {/* Subtle bottom curve */}
         <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-foreground/[0.02] to-transparent rounded-t-[50%]"></div>
       </section>
+
+      {/* Auth Modal */}
+      {showAuth && !session && (
+        <div
+          className="fixed inset-0 z-50 w-full h-full min-h-screen flex items-center justify-center px-6"
+          style={{
+            background:
+              "radial-gradient(ellipse at 50% 30%, rgb(90, 90, 90) 0%, rgb(65, 65, 65) 20%, rgb(50, 50, 50) 40%, rgb(38, 38, 38) 60%, rgb(28, 28, 28) 80%, rgb(20, 20, 20) 100%)",
+          }}
+        >
+          <button
+            onClick={() => setShowAuth(false)}
+            className="absolute top-8 left-8 flex items-center gap-2 text-zinc-400 hover:text-white transition-colors text-[15px] font-normal z-10"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            Back
+          </button>
+          <SupabaseAuth
+            onSession={(sess) => {
+              setSession(sess);
+              setShowAuth(false);
+            }}
+          />
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="relative z-10 py-8 px-8">
