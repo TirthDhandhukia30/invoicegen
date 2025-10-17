@@ -73,7 +73,7 @@ export default function InvoiceGenerator({ onBack }) {
   const [notes, setNotes] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [items, setItems] = useState([
-    { description: "", quantity: 1, price: 0, discount: 0 },
+    { description: "", quantity: 1, price: "", discount: 0 },
   ]);
   const [logo, setLogo] = useState("");
   const [taxRate, setTaxRate] = useState(10); // GST/Tax rate as percentage
@@ -231,12 +231,14 @@ export default function InvoiceGenerator({ onBack }) {
 
   // Calculations (after items is defined)
   const subtotal = items.reduce(
-    (sum, item) => sum + item.quantity * item.price,
+    (sum, item) => sum + item.quantity * (parseFloat(item.price) || 0),
     0
   );
   const totalDiscount = activeFields.discount
     ? items.reduce(
-        (sum, item) => sum + item.quantity * item.price * (item.discount / 100),
+        (sum, item) =>
+          sum +
+          item.quantity * (parseFloat(item.price) || 0) * (item.discount / 100),
         0
       ) +
       (subtotal * discount) / 100
@@ -270,7 +272,7 @@ export default function InvoiceGenerator({ onBack }) {
         setCurrency(data.currency || "USD");
         setItems(
           data.items || [
-            { description: "", quantity: 1, price: 0, discount: 0 },
+            { description: "", quantity: 1, price: "", discount: 0 },
           ]
         );
         setLogo(data.logo || "");
@@ -350,9 +352,9 @@ export default function InvoiceGenerator({ onBack }) {
 
   // Get theme colors for PDF
   const getThemeColors = useCallback(
-    (useTheme = null) => {
-      // If useTheme is provided, use it. Otherwise use the current UI theme.
-      const themeToUse = useTheme || theme;
+    (themeOverride = null) => {
+      // If themeOverride is provided, use it. Otherwise use the current UI theme.
+      const themeToUse = themeOverride || theme;
       const isDark =
         themeToUse === "dark" ||
         (themeToUse === "system" &&
@@ -650,7 +652,7 @@ export default function InvoiceGenerator({ onBack }) {
       setDueDate(null);
       setNotes("");
       setCurrency("USD");
-      setItems([{ description: "", quantity: 1, price: 0, discount: 0 }]);
+      setItems([{ description: "", quantity: 1, price: "", discount: 0 }]);
       setLogo("");
       setTaxRate(10);
       setDiscount(0);
@@ -683,10 +685,12 @@ export default function InvoiceGenerator({ onBack }) {
           ? {
               ...item,
               [field]:
-                field === "quantity" ||
-                field === "price" ||
-                field === "discount"
+                field === "quantity" || field === "discount"
                   ? Number(value)
+                  : field === "price"
+                  ? value === ""
+                    ? ""
+                    : Number(value)
                   : value,
             }
           : item
@@ -697,7 +701,7 @@ export default function InvoiceGenerator({ onBack }) {
   const handleAddItem = () => {
     setItems((items) => [
       ...items,
-      { description: "", quantity: 1, price: 0, discount: 0 },
+      { description: "", quantity: 1, price: "", discount: 0 },
     ]);
   };
 
@@ -1018,7 +1022,8 @@ export default function InvoiceGenerator({ onBack }) {
               </thead>
               <tbody>
                 {items.map((item, idx) => {
-                  const itemTotal = item.quantity * item.price;
+                  const itemPrice = parseFloat(item.price) || 0;
+                  const itemTotal = item.quantity * itemPrice;
                   const itemDiscount = activeFields.discount
                     ? itemTotal * (item.discount / 100)
                     : 0;
@@ -1057,7 +1062,7 @@ export default function InvoiceGenerator({ onBack }) {
                         }}
                       >
                         {currencySymbols[currency]}
-                        {item.price.toFixed(2)}
+                        {itemPrice.toFixed(2)}
                       </td>
                       {activeFields.discount && (
                         <td
@@ -1324,7 +1329,7 @@ export default function InvoiceGenerator({ onBack }) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center py-8 px-4 relative overflow-hidden transition-colors duration-300">
+    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden transition-colors duration-300">
       {/* Dotted grid background */}
       <div
         className="absolute inset-0 dark:opacity-100 opacity-30"
@@ -1335,556 +1340,718 @@ export default function InvoiceGenerator({ onBack }) {
         }}
       ></div>
 
-      {/* Radial gradient overlay */}
-      <div
-        className="absolute inset-0 opacity-60"
-        style={{
-          background:
-            "radial-gradient(circle at 50% 50%, transparent 30%, rgba(var(--background-rgb, 0, 0, 0), 0.6) 100%)",
-        }}
-      ></div>
-
-      <Card className="w-full max-w-6xl bg-card border-border relative z-10">
-        <CardContent className="p-8 flex flex-col md:flex-row gap-8">
-          {/* Form Section */}
-          <div className="flex-1">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl font-bold text-foreground mb-2 tracking-tight">
-                  Invoice Details
-                </CardTitle>
-                <CardDescription className="text-muted-foreground flex items-center gap-2">
-                  Fill out the invoice information below.
-                  <span className="hidden md:inline-flex items-center gap-1 text-xs text-muted-foreground/70">
-                    • Press{" "}
-                    <KbdGroup>
-                      <Kbd className="bg-muted text-muted-foreground border border-border text-[10px] h-4 min-w-4 px-0.5">
-                        ⌘
-                      </Kbd>
-                      <Kbd className="bg-muted text-muted-foreground border border-border text-[10px] h-4 min-w-4 px-0.5">
-                        ↵
-                      </Kbd>
-                    </KbdGroup>{" "}
-                    to generate PDF
-                  </span>
-                </CardDescription>
-              </div>
-              <Button
-                onClick={onBack}
-                variant="outline"
-                size="sm"
-                className="border-border bg-transparent text-foreground/90 hover:bg-accent hover:text-foreground"
-                type="button"
+      {/* Header */}
+      <div className="relative z-10 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={onBack}
+              variant="ghost"
+              size="sm"
+              className="text-foreground/70 hover:text-foreground"
+              type="button"
+            >
+              <svg
+                className="w-4 h-4 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-                Back
-              </Button>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Back
+            </Button>
+            <div>
+              <h1 className="text-lg font-bold text-foreground tracking-tight">
+                Create Invoice
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                Fill in the details below
+              </p>
             </div>
+          </div>
 
-            {/* Field Management Section */}
-            <div className="mb-4 p-3 border border-border rounded-lg bg-muted/30">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-sm font-semibold">Manage Fields</Label>
-                <span className="text-xs text-muted-foreground">
-                  {Object.values(activeFields).filter(Boolean).length} /{" "}
-                  {Object.keys(optionalFields).length} active
+          <div className="flex items-center gap-3">
+            {/* PDF Theme Toggle */}
+            <div className="flex items-center gap-2 bg-muted rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => setPdfTheme("light")}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-all ${
+                  pdfTheme === "light"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Light PDF"
+              >
+                <Sun className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium hidden sm:inline">
+                  Light
                 </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(optionalFields).map(
-                  ([key, { label, icon: Icon }]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => toggleField(key)}
-                      className={`
-                      inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all
-                      ${
-                        activeFields[key]
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                          : "bg-muted text-muted-foreground hover:bg-muted/70 border border-border"
-                      }
-                    `}
-                    >
-                      <Icon className="w-3.5 h-3.5" strokeWidth={2} />
-                      <span>{label}</span>
-                      {activeFields[key] && (
-                        <span className="ml-1 text-xs">✕</span>
-                      )}
-                    </button>
-                  )
-                )}
-              </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPdfTheme("dark")}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-all ${
+                  pdfTheme === "dark"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Dark PDF"
+              >
+                <Moon className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium hidden sm:inline">
+                  Dark
+                </span>
+              </button>
             </div>
 
-            <form className="space-y-4">
-              {activeFields.logo && (
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
-                    Logo
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="block w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded file:border file:border-border file:text-sm file:font-medium file:bg-secondary file:text-foreground hover:file:bg-accent file:transition-all"
-                    onChange={handleLogoUpload}
-                  />
-                  {logo && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <img
-                        src={logo}
-                        alt="Logo preview"
-                        className="h-12 w-auto object-contain rounded border border-border"
-                      />
-                      <button
-                        type="button"
-                        className="text-xs text-foreground underline hover:text-muted-foreground transition-colors"
-                        onClick={() => setLogo("")}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-border"
+              onClick={handleClearInvoice}
+            >
+              Clear
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={handleGeneratePDF}
+            >
+              <span>Generate PDF</span>
+              <KbdGroup className="hidden sm:inline-flex ml-2">
+                <Kbd className="bg-primary-foreground/20 text-primary-foreground border-0 text-[10px]">
+                  ⌘
+                </Kbd>
+                <Kbd className="bg-primary-foreground/20 text-primary-foreground border-0 text-[10px]">
+                  ↵
+                </Kbd>
+              </KbdGroup>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 relative z-10 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Form Section */}
+            <div className="space-y-6">
+              {/* Field Customization - Simplified */}
+              <Card className="border-border border-dashed">
+                <CardContent className="p-4">
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm font-medium text-foreground flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+                          />
+                        </svg>
+                        Customize Fields
+                      </span>
+                      <svg
+                        className="w-4 h-4 transition-transform group-open:rotate-180"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        Remove
-                      </button>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </summary>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {Object.entries(optionalFields).map(
+                        ([key, { label, icon: Icon }]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => toggleField(key)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                              activeFields[key]
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-muted-foreground hover:bg-muted/70"
+                            }`}
+                          >
+                            <Icon className="w-3 h-3" strokeWidth={2} />
+                            <span>{label}</span>
+                          </button>
+                        )
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </details>
+                </CardContent>
+              </Card>
 
-              {activeFields.companyName && (
-                <div className="space-y-2">
-                  <Label htmlFor="company">Company Name</Label>
-                  <Input
-                    id="company"
-                    type="text"
-                    placeholder="Enter company name"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                  />
-                </div>
-              )}
+              {/* Basic Info Card */}
+              <Card className="border-border">
+                <CardContent className="p-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Basic Information
+                  </h3>
+                  <div className="space-y-4">
+                    {activeFields.logo && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-2 block">
+                          Logo
+                        </Label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="block w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded file:border file:border-border file:text-sm file:font-medium file:bg-secondary file:text-foreground hover:file:bg-accent file:transition-all"
+                          onChange={handleLogoUpload}
+                        />
+                        {logo && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <img
+                              src={logo}
+                              alt="Logo preview"
+                              className="h-12 w-auto object-contain rounded border border-border"
+                            />
+                            <button
+                              type="button"
+                              className="text-xs text-destructive underline hover:text-destructive/80 transition-colors"
+                              onClick={() => setLogo("")}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-              {activeFields.companyAddress && (
-                <div className="space-y-2">
-                  <Label htmlFor="company-address">Company Address</Label>
-                  <Textarea
-                    id="company-address"
-                    placeholder="Street, City, State, ZIP"
-                    value={companyAddress}
-                    onChange={(e) => setCompanyAddress(e.target.value)}
-                    rows={2}
-                  />
-                </div>
-              )}
+                    {activeFields.companyName && (
+                      <div>
+                        <Label
+                          htmlFor="company"
+                          className="text-xs text-muted-foreground mb-2 block"
+                        >
+                          Company Name
+                        </Label>
+                        <Input
+                          id="company"
+                          type="text"
+                          placeholder="Your Company Inc."
+                          value={companyName}
+                          onChange={(e) => setCompanyName(e.target.value)}
+                        />
+                      </div>
+                    )}
 
-              {activeFields.clientName && (
-                <div className="space-y-2">
-                  <Label htmlFor="client">Client Name</Label>
-                  <Input
-                    id="client"
-                    type="text"
-                    placeholder="Enter client name"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                  />
-                </div>
-              )}
+                    {activeFields.companyAddress && (
+                      <div>
+                        <Label
+                          htmlFor="company-address"
+                          className="text-xs text-muted-foreground mb-2 block"
+                        >
+                          Company Address
+                        </Label>
+                        <Textarea
+                          id="company-address"
+                          placeholder="123 Business St, City, State ZIP"
+                          value={companyAddress}
+                          onChange={(e) => setCompanyAddress(e.target.value)}
+                          rows={2}
+                        />
+                      </div>
+                    )}
 
-              {activeFields.clientAddress && (
-                <div className="space-y-2">
-                  <Label htmlFor="client-address">Client Address</Label>
-                  <Textarea
-                    id="client-address"
-                    placeholder="Street, City, State, ZIP"
-                    value={clientAddress}
-                    onChange={(e) => setClientAddress(e.target.value)}
-                    rows={2}
-                  />
-                </div>
-              )}
+                    {activeFields.clientName && (
+                      <div>
+                        <Label
+                          htmlFor="client"
+                          className="text-xs text-muted-foreground mb-2 block"
+                        >
+                          Client Name
+                        </Label>
+                        <Input
+                          id="client"
+                          type="text"
+                          placeholder="Client Company or Name"
+                          value={clientName}
+                          onChange={(e) => setClientName(e.target.value)}
+                        />
+                      </div>
+                    )}
 
-              {activeFields.invoiceTitle && (
-                <div className="space-y-2">
-                  <Label htmlFor="invoice-title">Invoice Title/Subject</Label>
-                  <Input
-                    id="invoice-title"
-                    type="text"
-                    placeholder="e.g. Website Development Project"
-                    value={invoiceTitle}
-                    onChange={(e) => setInvoiceTitle(e.target.value)}
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-4">
-                {activeFields.invoiceNumber && (
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="invoice-number">Invoice Number</Label>
-                    <Input
-                      id="invoice-number"
-                      type="text"
-                      placeholder="e.g. #001845"
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
-                    />
+                    {activeFields.clientAddress && (
+                      <div>
+                        <Label
+                          htmlFor="client-address"
+                          className="text-xs text-muted-foreground mb-2 block"
+                        >
+                          Client Address
+                        </Label>
+                        <Textarea
+                          id="client-address"
+                          placeholder="456 Client Ave, City, State ZIP"
+                          value={clientAddress}
+                          onChange={(e) => setClientAddress(e.target.value)}
+                          rows={2}
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
+                </CardContent>
+              </Card>
 
-                {activeFields.currency && (
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select value={currency} onValueChange={setCurrency}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select currency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD ($)</SelectItem>
-                        <SelectItem value="EUR">EUR (€)</SelectItem>
-                        <SelectItem value="GBP">GBP (£)</SelectItem>
-                        <SelectItem value="INR">INR (₹)</SelectItem>
-                        <SelectItem value="JPY">JPY (¥)</SelectItem>
-                        <SelectItem value="AUD">AUD (A$)</SelectItem>
-                        <SelectItem value="CAD">CAD (C$)</SelectItem>
-                      </SelectContent>
-                    </Select>
+              {/* Invoice Details Card */}
+              <Card className="border-border">
+                <CardContent className="p-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Invoice Details
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      {activeFields.invoiceNumber && (
+                        <div>
+                          <Label
+                            htmlFor="invoice-number"
+                            className="text-xs text-muted-foreground mb-2 block"
+                          >
+                            Invoice #
+                          </Label>
+                          <Input
+                            id="invoice-number"
+                            type="text"
+                            placeholder="#001"
+                            value={invoiceNumber}
+                            onChange={(e) => setInvoiceNumber(e.target.value)}
+                          />
+                        </div>
+                      )}
+
+                      {activeFields.currency && (
+                        <div>
+                          <Label
+                            htmlFor="currency"
+                            className="text-xs text-muted-foreground mb-2 block"
+                          >
+                            Currency
+                          </Label>
+                          <Select value={currency} onValueChange={setCurrency}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="USD">USD ($)</SelectItem>
+                              <SelectItem value="EUR">EUR (€)</SelectItem>
+                              <SelectItem value="GBP">GBP (£)</SelectItem>
+                              <SelectItem value="INR">INR (₹)</SelectItem>
+                              <SelectItem value="JPY">JPY (¥)</SelectItem>
+                              <SelectItem value="AUD">AUD (A$)</SelectItem>
+                              <SelectItem value="CAD">CAD (C$)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {activeFields.date && (
+                        <div>
+                          <Label
+                            htmlFor="date"
+                            className="text-xs text-muted-foreground mb-2 block"
+                          >
+                            Issue Date
+                          </Label>
+                          <DatePicker
+                            date={date}
+                            onDateChange={setDate}
+                            placeholder="Select date"
+                          />
+                        </div>
+                      )}
+
+                      {activeFields.dueDate && (
+                        <div>
+                          <Label
+                            htmlFor="due-date"
+                            className="text-xs text-muted-foreground mb-2 block"
+                          >
+                            Due Date
+                          </Label>
+                          <DatePicker
+                            date={dueDate}
+                            onDateChange={setDueDate}
+                            placeholder="Select due date"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {activeFields.invoiceTitle && (
+                      <div>
+                        <Label
+                          htmlFor="invoice-title"
+                          className="text-xs text-muted-foreground mb-2 block"
+                        >
+                          Subject/Title
+                        </Label>
+                        <Input
+                          id="invoice-title"
+                          type="text"
+                          placeholder="Project or service description"
+                          value={invoiceTitle}
+                          onChange={(e) => setInvoiceTitle(e.target.value)}
+                        />
+                      </div>
+                    )}
+
+                    {activeFields.notes && (
+                      <div>
+                        <Label
+                          htmlFor="notes"
+                          className="text-xs text-muted-foreground mb-2 block"
+                        >
+                          Notes
+                        </Label>
+                        <Textarea
+                          id="notes"
+                          placeholder="Additional information..."
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          rows={2}
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </CardContent>
+              </Card>
 
-              <div className="flex gap-4">
-                {activeFields.date && (
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="date">Date</Label>
-                    <DatePicker
-                      date={date}
-                      onDateChange={setDate}
-                      placeholder="Select date"
-                    />
-                  </div>
-                )}
-
-                {activeFields.dueDate && (
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="due-date">Due Date</Label>
-                    <DatePicker
-                      date={dueDate}
-                      onDateChange={setDueDate}
-                      placeholder="Select due date"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {activeFields.notes && (
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Additional notes..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-4">
-                {activeFields.tax && (
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="taxRate">Tax/GST Rate (%)</Label>
-                    <Input
-                      id="taxRate"
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.01}
-                      placeholder="10"
-                      value={taxRate}
-                      onChange={(e) =>
-                        setTaxRate(parseFloat(e.target.value) || 0)
-                      }
-                    />
-                  </div>
-                )}
-
-                {activeFields.discount && (
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="discount">Overall Discount (%)</Label>
-                    <Input
-                      id="discount"
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.01}
-                      placeholder="0"
-                      value={discount}
-                      onChange={(e) =>
-                        setDiscount(parseFloat(e.target.value) || 0)
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-
-              {activeFields.payment && (
-                <div className="space-y-2">
-                  <Label>Payment Information</Label>
-                  <Input
-                    type="text"
-                    placeholder="Payment Method (e.g., Bank Transfer, UPI, Cash)"
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="mb-2"
-                  />
-                  <Input
-                    type="text"
-                    placeholder="Bank Name"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    className="mb-2"
-                  />
-                  <Input
-                    type="text"
-                    placeholder="Account Name / Holder Name"
-                    value={accountName}
-                    onChange={(e) => setAccountName(e.target.value)}
-                    className="mb-2"
-                  />
-                  <Input
-                    type="text"
-                    placeholder="Account Number"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                    className="mb-2"
-                  />
-                  <Input
-                    type="text"
-                    placeholder="BSB / IFSC Code / Routing Number"
-                    value={routingNumber}
-                    onChange={(e) => setRoutingNumber(e.target.value)}
-                  />
-                </div>
-              )}
-
-              {activeFields.terms && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="terms">Terms & Conditions</Label>
+              {/* Items Card */}
+              <Card className="border-border">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Line Items
+                    </h3>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setTerms(standardTerms)}
-                      className="h-7 text-xs"
+                      onClick={handleAddItem}
                     >
-                      Use Standard Terms
+                      + Add Item
                     </Button>
                   </div>
-                  <Textarea
-                    id="terms"
-                    placeholder="e.g., Payment is due within 30 days. Late payments may incur additional fees."
-                    value={terms}
-                    onChange={(e) => setTerms(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              )}
+                  <div className="space-y-3">
+                    {items.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex gap-2 items-start p-4 bg-muted/30 rounded-lg border border-border"
+                      >
+                        <div className="flex-1 space-y-3">
+                          <Input
+                            type="text"
+                            className="text-sm"
+                            placeholder="Item description"
+                            value={item.description}
+                            onChange={(e) =>
+                              handleItemChange(
+                                idx,
+                                "description",
+                                e.target.value
+                              )
+                            }
+                          />
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">
+                                Quantity
+                              </Label>
+                              <Input
+                                type="number"
+                                className="text-sm"
+                                min={1}
+                                placeholder="0"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    idx,
+                                    "quantity",
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">
+                                Price
+                              </Label>
+                              <Input
+                                type="number"
+                                className="text-sm"
+                                min={0}
+                                step={0.01}
+                                placeholder="0"
+                                value={item.price}
+                                onChange={(e) =>
+                                  handleItemChange(idx, "price", e.target.value)
+                                }
+                              />
+                            </div>
+                            {activeFields.discount && (
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">
+                                  Discount %
+                                </Label>
+                                <Input
+                                  type="number"
+                                  className="text-sm"
+                                  min={0}
+                                  max={100}
+                                  step={0.01}
+                                  placeholder="0"
+                                  value={item.discount}
+                                  onChange={(e) =>
+                                    handleItemChange(
+                                      idx,
+                                      "discount",
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(idx)}
+                            className="text-destructive hover:text-destructive/80 p-2"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
-              <div className="space-y-2">
-                <Label className="mb-2">Items</Label>
-                <div className="space-y-2">
-                  {items.map((item, idx) => (
-                    <div key={idx} className="flex gap-2 items-center">
-                      <Input
-                        type="text"
-                        className="flex-1 text-sm h-9"
-                        placeholder="Description"
-                        value={item.description}
-                        onChange={(e) =>
-                          handleItemChange(idx, "description", e.target.value)
-                        }
-                      />
-                      <Input
-                        type="number"
-                        className="w-16 text-sm h-9"
-                        min={1}
-                        placeholder="Qty"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleItemChange(idx, "quantity", e.target.value)
-                        }
-                      />
-                      <Input
-                        type="number"
-                        className="w-20 text-sm h-9"
-                        min={0}
-                        step={0.01}
-                        placeholder="Price"
-                        value={item.price}
-                        onChange={(e) =>
-                          handleItemChange(idx, "price", e.target.value)
-                        }
-                      />
-                      {activeFields.discount && (
-                        <Input
-                          type="number"
-                          className="w-16 text-sm h-9"
-                          min={0}
-                          max={100}
-                          step={0.01}
-                          placeholder="Dis%"
-                          value={item.discount}
-                          onChange={(e) =>
-                            handleItemChange(idx, "discount", e.target.value)
-                          }
-                        />
-                      )}
-                      {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(idx)}
-                          className="text-destructive hover:text-destructive/80 text-sm px-2"
-                        >
-                          ✕
-                        </button>
-                      )}
+                  {/* Totals Summary */}
+                  <div className="mt-4 pt-4 border-t border-border space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span className="font-medium">
+                        {currencySymbols[currency]}
+                        {subtotal.toFixed(2)}
+                      </span>
                     </div>
-                  ))}
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={handleAddItem}
-                >
-                  Add Item
-                </Button>
-              </div>
-            </form>
-          </div>
+                    {activeFields.tax && (
+                      <div className="flex justify-between text-sm items-center gap-2">
+                        <span className="text-muted-foreground">
+                          Tax ({taxRate}%):
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            className="w-16 h-7 text-xs"
+                            min={0}
+                            max={100}
+                            step={0.01}
+                            value={taxRate}
+                            onChange={(e) =>
+                              setTaxRate(parseFloat(e.target.value) || 0)
+                            }
+                          />
+                          <span className="font-medium">
+                            {currencySymbols[currency]}
+                            {tax.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {activeFields.discount && totalDiscount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Discount:</span>
+                        <span className="font-medium text-destructive">
+                          -{currencySymbols[currency]}
+                          {totalDiscount.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-base font-bold pt-2 border-t border-border">
+                      <span>Total:</span>
+                      <span>
+                        {currencySymbols[currency]}
+                        {grandTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Preview Section */}
-          <div className="flex-1">
-            <div className="mb-6 flex items-start justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-foreground mb-2 tracking-tight">
+              {/* Payment & Terms - Collapsible */}
+              {(activeFields.payment || activeFields.terms) && (
+                <Card className="border-border">
+                  <CardContent className="p-6">
+                    <h3 className="text-sm font-semibold text-foreground mb-4">
+                      Additional Details
+                    </h3>
+
+                    {activeFields.payment && (
+                      <div className="space-y-3 mb-4">
+                        <Label className="text-xs text-muted-foreground">
+                          Payment Information
+                        </Label>
+                        <Input
+                          type="text"
+                          placeholder="Payment method"
+                          value={paymentMethod}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="text-sm"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            type="text"
+                            placeholder="Bank name"
+                            value={bankName}
+                            onChange={(e) => setBankName(e.target.value)}
+                            className="text-sm"
+                          />
+                          <Input
+                            type="text"
+                            placeholder="Account name"
+                            value={accountName}
+                            onChange={(e) => setAccountName(e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            type="text"
+                            placeholder="Account number"
+                            value={accountNumber}
+                            onChange={(e) => setAccountNumber(e.target.value)}
+                            className="text-sm"
+                          />
+                          <Input
+                            type="text"
+                            placeholder="BSB/IFSC/Routing"
+                            value={routingNumber}
+                            onChange={(e) => setRoutingNumber(e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {activeFields.terms && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs text-muted-foreground">
+                            Terms & Conditions
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setTerms(standardTerms)}
+                            className="h-6 text-xs"
+                          >
+                            Use Template
+                          </Button>
+                        </div>
+                        <Textarea
+                          placeholder="Payment terms and conditions..."
+                          value={terms}
+                          onChange={(e) => setTerms(e.target.value)}
+                          rows={3}
+                          className="text-sm"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Preview Section */}
+            <div className="lg:sticky lg:top-8 h-fit">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-foreground mb-1">
                   Live Preview
-                </h2>
-                <p className="text-muted-foreground text-sm">
+                </h3>
+                <p className="text-xs text-muted-foreground">
                   Your invoice updates in real-time
                 </p>
               </div>
-
-              {/* PDF Theme Toggle */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground font-medium">
-                  Invoice Theme:
-                </span>
-                <div className="flex items-center gap-2 bg-muted rounded-lg p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setPdfTheme("light")}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-all ${
-                      pdfTheme === "light"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                    title="Light PDF"
+              <div
+                ref={previewRef}
+                data-html2canvas-ignore-global-styles="true"
+                style={{
+                  backgroundColor: getThemeColors().background,
+                  border: `1px solid ${getThemeColors().borderStrong}`,
+                  borderRadius: "8px",
+                  padding: "32px",
+                  position: "relative",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                  color: getThemeColors().text,
+                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  maxHeight: "800px",
+                  overflowY: "auto",
+                }}
+              >
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={sectionOrder}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <Sun className="w-3.5 h-3.5" />
-                    <span className="text-xs font-medium">Light</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPdfTheme("dark")}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-all ${
-                      pdfTheme === "dark"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                    title="Dark PDF"
-                  >
-                    <Moon className="w-3.5 h-3.5" />
-                    <span className="text-xs font-medium">Dark</span>
-                  </button>
-                </div>
+                    {sectionOrder.map((sectionId) => (
+                      <SortableSection key={sectionId} id={sectionId}>
+                        {renderSection(sectionId)}
+                      </SortableSection>
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </div>
             </div>
-            <div
-              ref={previewRef}
-              data-html2canvas-ignore-global-styles="true"
-              style={{
-                backgroundColor: getThemeColors().background,
-                border: `1px solid ${getThemeColors().borderStrong}`,
-                borderRadius: "8px",
-                padding: "32px",
-                position: "relative",
-                boxShadow: "inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)",
-                color: getThemeColors().text,
-                fontFamily: "system-ui, -apple-system, sans-serif",
-                maxHeight: "calc(100vh - 200px)",
-                overflowY: "auto",
-              }}
-            >
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={sectionOrder}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {sectionOrder.map((sectionId) => (
-                    <SortableSection key={sectionId} id={sectionId}>
-                      {renderSection(sectionId)}
-                    </SortableSection>
-                  ))}
-                </SortableContext>
-              </DndContext>
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="flex-1 border-2 border-foreground bg-transparent text-foreground px-4 py-3 rounded-lg hover:bg-accent hover:text-foreground hover:border-foreground transition-all font-semibold text-base flex items-center justify-center gap-3"
-                onClick={handleGeneratePDF}
-              >
-                <span>Generate PDF</span>
-                <KbdGroup className="hidden sm:inline-flex">
-                  <Kbd className="bg-muted text-foreground border border-border">
-                    ⌘
-                  </Kbd>
-                  <Kbd className="bg-muted text-foreground border border-border">
-                    ↵
-                  </Kbd>
-                </KbdGroup>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="border-2 border-foreground bg-transparent text-foreground px-4 py-3 rounded-lg hover:bg-accent hover:text-foreground hover:border-foreground transition-all font-semibold text-base"
-                onClick={handleClearInvoice}
-              >
-                Clear
-              </Button>
-            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

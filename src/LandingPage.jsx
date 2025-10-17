@@ -92,7 +92,7 @@ export default function LandingPage({ onOpen }) {
           <Button
             variant="outline"
             size="lg"
-            className="border-foreground/40 bg-transparent text-foreground px-8 py-3 rounded-full hover:bg-foreground/10 hover:border-foreground/60 hover:text-foreground font-medium text-base tracking-wide"
+            className="border-2 border-dashed border-foreground/30 bg-transparent text-foreground px-8 py-4 rounded-2xl hover:bg-foreground/5 hover:border-foreground/50 font-medium text-base tracking-wide transition-all"
             onClick={onOpen}
           >
             <span>Create Invoice</span>
@@ -114,24 +114,13 @@ export default function LandingPage({ onOpen }) {
           <Button
             variant="outline"
             size="lg"
-            className="ml-6 mt-4 border-foreground/40 bg-transparent text-foreground px-8 py-3 rounded-full hover:bg-foreground/10 hover:border-foreground/60 hover:text-foreground font-medium text-base tracking-wide"
+            className="ml-6 mt-4 border-2 border-dashed border-foreground/30 bg-transparent text-foreground px-8 py-4 rounded-2xl hover:bg-foreground/5 hover:border-foreground/50 font-medium text-base tracking-wide transition-all"
             onClick={async () => {
               if (session) {
-                // Check if it's a demo session
-                if (
-                  session.user?.user_metadata?.is_demo ||
-                  session.access_token === "demo-token"
-                ) {
-                  // For demo sessions, just clear and show auth
-                  setSession(null);
-                  setShowAuth(true);
-                } else {
-                  // For real sessions, sign out via Supabase
-                  const { supabase } = await import("@/lib/supabase");
-                  await supabase.auth.signOut();
-                  setSession(null);
-                  setShowAuth(true);
-                }
+                // Sign out via Supabase
+                await supabase.auth.signOut();
+                setSession(null);
+                setShowAuth(true);
               } else {
                 // Show login modal
                 setShowAuth(true);
@@ -147,17 +136,11 @@ export default function LandingPage({ onOpen }) {
       </section>
 
       {/* Auth Modal */}
-      {showAuth && !session && (
-        <div
-          className="fixed inset-0 z-50 w-full h-full min-h-screen flex items-center justify-center px-6"
-          style={{
-            background:
-              "radial-gradient(ellipse at 50% 30%, rgb(90, 90, 90) 0%, rgb(65, 65, 65) 20%, rgb(50, 50, 50) 40%, rgb(38, 38, 38) 60%, rgb(28, 28, 28) 80%, rgb(20, 20, 20) 100%)",
-          }}
-        >
+      {showAuth && (
+        <div className="fixed inset-0 z-50 w-full h-full min-h-screen flex items-center justify-center px-6 bg-background">
           <button
             onClick={() => setShowAuth(false)}
-            className="absolute top-8 left-8 flex items-center gap-2 text-zinc-400 hover:text-white transition-colors text-[15px] font-normal z-10"
+            className="absolute top-8 left-8 flex items-center gap-2 text-foreground/60 hover:text-foreground transition-colors text-[15px] font-normal z-10"
           >
             <svg
               className="w-4 h-4"
@@ -177,7 +160,10 @@ export default function LandingPage({ onOpen }) {
           <SupabaseAuth
             onSession={(sess) => {
               setSession(sess);
-              setShowAuth(false);
+              if (sess) {
+                // If there's a session, hide auth modal
+                setShowAuth(false);
+              }
             }}
           />
         </div>
