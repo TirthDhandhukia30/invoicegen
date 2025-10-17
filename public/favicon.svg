@@ -1,0 +1,14 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Three sparkle/star shapes -->
+  <!-- Center large sparkle -->
+  <path d="M16 4 L16.8 10 L16 26 L15.2 10 Z" fill="white"/>
+  <path d="M16 10 L11 11 L16 12 L21 11 Z" fill="white"/>
+  
+  <!-- Left sparkle -->
+  <path d="M10 8 L10.5 12 L10 20 L9.5 12 Z" fill="white"/>
+  <path d="M10 12 L6.5 12.5 L10 13 L13.5 12.5 Z" fill="white"/>
+  
+  <!-- Right sparkle -->
+  <path d="M22 8 L22.5 12 L22 20 L21.5 12 Z" fill="white"/>
+  <path d="M22 12 L18.5 12.5 L22 13 L25.5 12.5 Z" fill="white"/>
+</svg>
