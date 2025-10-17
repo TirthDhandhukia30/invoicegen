@@ -117,11 +117,21 @@ export default function LandingPage({ onOpen }) {
             className="ml-6 mt-4 border-foreground/40 bg-transparent text-foreground px-8 py-3 rounded-full hover:bg-foreground/10 hover:border-foreground/60 hover:text-foreground font-medium text-base tracking-wide"
             onClick={async () => {
               if (session) {
-                // Logout and redirect to auth page
-                const { supabase } = await import("@/lib/supabase");
-                await supabase.auth.signOut();
-                setSession(null);
-                setShowAuth(true);
+                // Check if it's a demo session
+                if (
+                  session.user?.user_metadata?.is_demo ||
+                  session.access_token === "demo-token"
+                ) {
+                  // For demo sessions, just clear and show auth
+                  setSession(null);
+                  setShowAuth(true);
+                } else {
+                  // For real sessions, sign out via Supabase
+                  const { supabase } = await import("@/lib/supabase");
+                  await supabase.auth.signOut();
+                  setSession(null);
+                  setShowAuth(true);
+                }
               } else {
                 // Show login modal
                 setShowAuth(true);

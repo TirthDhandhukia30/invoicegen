@@ -4,11 +4,9 @@ import { supabase } from "@/lib/supabase";
 export default function SupabaseAuth({ onSession, onInitializing, children }) {
   const [session, setSession] = useState(null);
   const [initializing, setInitializing] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [demoTimeRemaining, setDemoTimeRemaining] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -35,18 +33,46 @@ export default function SupabaseAuth({ onSession, onInitializing, children }) {
     };
   }, [onSession, onInitializing]);
 
-  const handleEmailSignIn = async (e) => {
-    e.preventDefault();
+  // Timer effect for demo session
+  useEffect(() => {
+    if (demoTimeRemaining === null || demoTimeRemaining <= 0) return;
+
+    const interval = setInterval(() => {
+      setDemoTimeRemaining((prev) => {
+        if (prev <= 1) {
+          // Demo session expired
+          setSession(null);
+          if (onSession) onSession(null);
+          setError("Demo session expired. Please login again.");
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [demoTimeRemaining, onSession]);
+
+  const handleDemoLogin = async () => {
     setLoading(true);
     setError("");
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Create demo session with 5-minute expiry
+      const mockSession = {
+        user: {
+          id: "demo-user-id",
+          email: "demo@invoicegen.app",
+          user_metadata: { is_demo: true },
+        },
+        access_token: "demo-token",
+        expires_at: Date.now() + 5 * 60 * 1000, // 5 minutes from now
+      };
 
-      if (error) throw error;
+      setSession(mockSession);
+      setDemoTimeRemaining(300); // 5 minutes in seconds
+
+      if (onSession) onSession(mockSession);
     } catch (error) {
       setError(error.message);
     } finally {
@@ -78,7 +104,6 @@ export default function SupabaseAuth({ onSession, onInitializing, children }) {
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-[#070607] relative overflow-hidden">
-        {/* Light beam overlay - top-left angled gradient */}
         <div
           className="absolute inset-0 pointer-events-none opacity-[0.15]"
           style={{
@@ -94,9 +119,7 @@ export default function SupabaseAuth({ onSession, onInitializing, children }) {
           }}
         />
 
-        {/* Glass Card */}
         <div className="relative w-[90%] max-w-[380px] z-10">
-          {/* Card with embossed glass effect */}
           <div
             className="relative rounded-[24px] px-[26px] py-[28px] overflow-hidden"
             style={{
@@ -107,9 +130,7 @@ export default function SupabaseAuth({ onSession, onInitializing, children }) {
                 "0 12px 40px rgba(0,0,0,0.7), inset 1px 1px 0 rgba(255,255,255,0.06), inset -1px -1px 0 rgba(0,0,0,0.3)",
             }}
           >
-            {/* Header with logo */}
             <div className="text-center mb-7">
-              {/* InvoiceGen Logo */}
               <div className="flex justify-center">
                 <div className="font-bold text-xl text-white tracking-tighter">
                   INVOICE<span className="font-light">GEN</span>
@@ -117,124 +138,38 @@ export default function SupabaseAuth({ onSession, onInitializing, children }) {
               </div>
             </div>
 
-            {/* Error message */}
             {error && (
-              <div className="mb-5 p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-[12px]">
+              <div
+                className={`mb-5 p-2.5 border rounded-xl text-[12px] ${
+                  error.includes("successfully") ||
+                  error.includes("Check your email")
+                    ? "bg-green-500/10 border-green-500/20 text-green-400"
+                    : "bg-red-500/10 border-red-500/20 text-red-400"
+                }`}
+              >
                 {error}
               </div>
             )}
 
-            {/* Email/Password Form */}
-            <form onSubmit={handleEmailSignIn} className="space-y-3.5">
-              {/* Email Input */}
-              <div>
-                <label htmlFor="email" className="sr-only">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="w-full h-[42px] px-4 rounded-full text-white text-[14px] placeholder-[#9a9a9a] focus:outline-none focus:ring-1 focus:ring-white/30 transition-all disabled:opacity-50"
-                  style={{
-                    background: "rgba(255,255,255,0.02)",
-                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.02)",
-                  }}
-                />
+            {demoTimeRemaining !== null && demoTimeRemaining > 0 && (
+              <div className="mb-5 p-2.5 border rounded-xl text-[12px] bg-blue-500/10 border-blue-500/20 text-blue-400 text-center">
+                Demo session: {Math.floor(demoTimeRemaining / 60)}:
+                {String(demoTimeRemaining % 60).padStart(2, "0")} remaining
               </div>
+            )}
 
-              {/* Password Input */}
-              <div className="relative">
-                <label htmlFor="password" className="sr-only">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="w-full h-[42px] px-4 pr-12 rounded-full text-white text-[14px] placeholder-[#9a9a9a] focus:outline-none focus:ring-1 focus:ring-white/30 transition-all disabled:opacity-50"
-                  style={{
-                    background: "rgba(255,255,255,0.02)",
-                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.02)",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9a9a9a] hover:text-white transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? (
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      />
-                    </svg>
-                  )}
-                </button>
-              </div>
+            <button
+              onClick={handleDemoLogin}
+              disabled={loading}
+              className="w-full h-[44px] bg-white text-[#0b0b0b] rounded-full font-semibold text-[14px] hover:-translate-y-[1px] active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+              style={{
+                boxShadow:
+                  "inset 0 1px 2px rgba(0,0,0,0.1), 0 2px 8px rgba(255,255,255,0.1)",
+              }}
+            >
+              {loading ? "Starting Demo..." : "Try Demo (5 min)"}
+            </button>
 
-              {/* Forgot Password */}
-              <div className="text-right">
-                <button
-                  type="button"
-                  className="text-[12px] text-[#9e9e9e] hover:text-white transition-colors"
-                >
-                  Forgot Password?
-                </button>
-              </div>
-
-              {/* Primary Sign In Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-[44px] bg-white text-[#0b0b0b] rounded-full font-semibold text-[14px] hover:-translate-y-[1px] active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-5"
-                style={{
-                  boxShadow:
-                    "inset 0 1px 2px rgba(0,0,0,0.1), 0 2px 8px rgba(255,255,255,0.1)",
-                }}
-              >
-                {loading ? "Signing in..." : "Sign In"}
-              </button>
-            </form>
-
-            {/* Divider */}
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
                 <div
@@ -252,7 +187,6 @@ export default function SupabaseAuth({ onSession, onInitializing, children }) {
               </div>
             </div>
 
-            {/* Google Sign In */}
             <button
               onClick={handleGoogleSignIn}
               disabled={loading}
@@ -283,18 +217,9 @@ export default function SupabaseAuth({ onSession, onInitializing, children }) {
               Continue with Google
             </button>
 
-            {/* Footer */}
-            <div className="text-center mt-6">
-              <p className="text-[12px] text-[#9e9e9e]">
-                Don't have an account?{" "}
-                <button
-                  type="button"
-                  className="text-[#cbd5ff] hover:underline transition-all"
-                >
-                  Sign up
-                </button>
-              </p>
-            </div>
+            <p className="text-center text-[11px] text-[#9e9e9e] mt-6">
+              Demo account provides temporary 5-minute access
+            </p>
           </div>
         </div>
       </div>
